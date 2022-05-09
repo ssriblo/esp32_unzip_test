@@ -143,6 +143,7 @@ void unzipTest() {
   unz_file_info fi;
   UNZIP zip; // Statically allocate the 41K UNZIP class/structure
 
+// #define ZIP_FILE_AT_ROM 1
 #ifdef ZIP_FILE_AT_ROM
   rc = zip.openZIP((uint8_t *)bmp_icons, sizeof(bmp_icons));
 #else
