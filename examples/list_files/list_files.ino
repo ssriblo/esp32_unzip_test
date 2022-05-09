@@ -2,6 +2,9 @@
 // ZIP library example sketch
 // Based on https://github.com/bitbank2/unzipLIB
 //
+
+#include <SPIFFS.h>
+#include <fstream>
 #include <unzipLIB.h>
 // Use a zip file in memory for this test
 #include "bmp_icons.h"
@@ -21,9 +24,93 @@ Serial.printf_P(PSTR("<<<<<<< free heap memory *3* %d >>>>>>>>\n"), ESP.getFreeH
 
 }
 
+static File myfile;
+
+//
+// Callback functions needed by the unzipLIB to access a file system
+// The library has built-in code for memory-to-memory transfers, but needs
+// these callback functions to allow using other storage media
+//
+void * myOpen(const char *filename, int32_t *size) {
+  myfile = SPIFFS.open(filename);
+  *size = myfile.size();
+  return (void *)&myfile;
+}
+void myClose(void *p) {
+  ZIPFILE *pzf = (ZIPFILE *)p;
+  File *f = (File *)pzf->fHandle;
+  if (f) f->close();
+}
+
+int32_t myRead(void *p, uint8_t *buffer, int32_t length) {
+  ZIPFILE *pzf = (ZIPFILE *)p;
+  File *f = (File *)pzf->fHandle;
+  return f->read(buffer, length);
+}
+
+int32_t mySeek(void *p, int32_t position, int iType) {
+  ZIPFILE *pzf = (ZIPFILE *)p;
+  File *f = (File *)pzf->fHandle;
+  if (iType == SEEK_SET)
+    return f->seek(position);
+  else if (iType == SEEK_END) {
+    return f->seek(position + pzf->iSize); 
+  } else { // SEEK_CUR
+    long l = f->position();
+    return f->seek(l + position);
+  }
+}
+
+void listAllFiles(){
+   File root = SPIFFS.open("/");
+   File file = root.openNextFile();
+   while(file){
+       Serial.print("FILE: ");
+      Serial.println(file.name());
+ 
+      file = root.openNextFile();
+  }
+}
+
+void spiffs_write_read_test()
+{
+
+  // bool formatted = SPIFFS.format();
+  //  if(formatted){
+  //   Serial.println("\n\nSuccess formatting");
+  // }else{
+  //   Serial.println("\n\nError formatting");
+  // }
+ 
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+   Serial.println("\n\n----Listing files after format----");
+  listAllFiles();
+
+  std::ofstream fileToWrite;
+  fileToWrite.open("/spiffs/test.txt");
+   
+  fileToWrite << "Test";
+  fileToWrite.close();
+ 
+  std::ifstream fileToRead("/spiffs/test.txt");
+ 
+  char c;
+  while(fileToRead.get(c)){
+ 
+    Serial.print(c);
+  }
+  Serial.println();
+}
+
 void setup() {
   Serial.begin(115200);
   while (!Serial) {};
+
+  spiffs_write_read_test();
 
 Serial.printf_P(PSTR("<<<<<<< free heap memory *1* %d >>>>>>>>\n"), ESP.getFreeHeap());
 
@@ -56,7 +143,14 @@ void unzipTest() {
   unz_file_info fi;
   UNZIP zip; // Statically allocate the 41K UNZIP class/structure
 
+#ifdef ZIP_FILE_AT_ROM
   rc = zip.openZIP((uint8_t *)bmp_icons, sizeof(bmp_icons));
+#else
+  // file at SPIFFS. To store icons.zip file at flash spiffs let use Arduino IDE plugin
+  // from https://github.com/me-no-dev/arduino-esp32fs-plugin
+  rc = zip.openZIP("/icons.zip", myOpen, myClose, myRead, mySeek);
+#endif
+
   if (rc == UNZ_OK) {
      rc = zip.getGlobalComment(szComment, sizeof(szComment));
      Serial.print("Global comment: ");
