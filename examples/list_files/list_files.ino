@@ -215,7 +215,8 @@ void unzipTest() {
     }
     file.close();
 
-    file = SPIFFS.open("/tempFile", FILE_READ); // 
+    String path = "/tempFile";
+    file = SPIFFS.open(path.c_str(), FILE_READ); // 
     if (!file) {
       Serial.println("There was an error opening the file for writing");
       return;
@@ -224,10 +225,13 @@ void unzipTest() {
     Serial.print("res=");
     Serial.println(res);
     if(res){
-      Serial.println("File was written");
+      Serial.println("File was read");
     } else {
-      Serial.println("File write failed");
+      Serial.println("File read failed");
     }
+    bool br = SPIFFS.remove(path.c_str());
+    Serial.print("SPIFFS remove result ");
+    Serial.println(br);
     file.close();
 
     Serial.print("size=");
