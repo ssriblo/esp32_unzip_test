@@ -15,7 +15,9 @@ void task(){
   unzipTest();
   Serial.println("************************************");
   Serial.flush();
-Serial.printf_P(PSTR("<<<<<<< free heap memory *3* %d >>>>>>>>\n"), ESP.getFreeHeap());
+  Serial.printf_P(PSTR("<<<<<<< free heap memory *3* %d >>>>>>>>\n"), ESP.getFreeHeap());
+  // vTaskDelete(NULL);
+
   while (1)
   {
           vTaskDelay( 1 * portTICK_PERIOD_MS ); // actually 150 ms period, why??
@@ -36,6 +38,7 @@ void * myOpen(const char *filename, int32_t *size) {
   *size = myfile.size();
   return (void *)&myfile;
 }
+
 void myClose(void *p) {
   ZIPFILE *pzf = (ZIPFILE *)p;
   File *f = (File *)pzf->fHandle;
@@ -126,7 +129,7 @@ Serial.printf_P(PSTR("<<<<<<< free heap memory *1* %d >>>>>>>>\n"), ESP.getFreeH
                 &xHandle,       /* Task handle. */
                 1);  /* Core where the task should run */
 
-  delay(1000);
+  delay(10000);
   Serial.println("UNZIP library demo - open a zip file from FLASH");
   Serial.flush();
   if( xHandle != NULL )
@@ -170,10 +173,12 @@ void unzipTest() {
               Serial.print(ucBitmap[i], HEX);
               Serial.print(" ");
             }
+
           }
       }
-     rc = UNZ_OK;
-     while (rc == UNZ_OK) { // Display all files contained in the archive
+      Serial.println(" ");
+      rc = UNZ_OK;
+      while (rc == UNZ_OK) { // Display all files contained in the archive
         rc = zip.getFileInfo(&fi, szName, sizeof(szName), NULL, 0, szComment, sizeof(szComment));
         if (rc == UNZ_OK) {
           Serial.print(szName);
@@ -184,7 +189,56 @@ void unzipTest() {
         }
         rc = zip.gotoNextFile();
      }
+     int32_t size = (uint32_t)fi.uncompressed_size;
      zip.closeZIP();
+
+    Serial.println("");
+    Serial.println("**** LET WRITE TO FILE ****");
+
+    uint8_t *ucBitmapRead;
+    ucBitmapRead = (uint8_t *)malloc(size); // allocate enough to hold the bitmap
+
+    File file = SPIFFS.open("/tempFile", FILE_WRITE); // 
+    if (!file) {
+      Serial.println("There was an error opening the file for writing");
+      return;
+    }
+    int res = file.write(ucBitmap, size);
+    Serial.print("res=");
+    Serial.println(res);
+    Serial.print("size=");
+    Serial.println(size);
+    if(res){
+      Serial.println("File was written");
+    } else {
+      Serial.println("File write failed");
+    }
+    file.close();
+
+    file = SPIFFS.open("/tempFile", FILE_READ); // 
+    if (!file) {
+      Serial.println("There was an error opening the file for writing");
+      return;
+    }
+    res = file.read(ucBitmapRead, size);
+    Serial.print("res=");
+    Serial.println(res);
+    if(res){
+      Serial.println("File was written");
+    } else {
+      Serial.println("File write failed");
+    }
+    file.close();
+
+    Serial.print("size=");
+    Serial.println(size);
+    for(int i=0; i<size;i++){
+      Serial.print(ucBitmapRead[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println("\n");
+    Serial.println("FINISH");
+
   }
 }
 
